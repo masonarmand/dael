@@ -70,15 +70,20 @@ void quit(const char* args);
 
 
 void grab_keys();
+
 void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
+void handle_map_request(XEvent* e);
+
 void Dael_State_init(Dael_State* wm);
 void Dael_State_free(Dael_State* wm);
+
 int xerror_handler(Display* display, XErrorEvent* error);
 
 /* XEvent handler functions */
 Dael_EventHandler event_handlers[] = {
     { KeyPress, handle_key_press },
+    { MapRequest, handle_map_request },
     { 0, NULL }
 };
 
@@ -235,6 +240,12 @@ void handle_key_press(XEvent* e)
                 }
                 i++;
         }
+}
+
+void handle_map_request(XEvent* e)
+{
+        XMapRequestEvent* req = &e->xmaprequest;
+        XMapWindow(wm.dpy, req->window);
 }
 
 
