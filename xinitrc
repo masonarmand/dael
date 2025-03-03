@@ -1,1 +1,1 @@
-exec ./notewm
+exec ./dael
