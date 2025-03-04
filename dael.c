@@ -51,7 +51,7 @@ typedef struct {
 
 typedef struct {
         Dael_Cursors curs;
-        Dael_Workspace* workspaces;
+        Dael_Workspace* current_workspace;
         XFontStruct* font;
         Window root;
         Display* dpy;
@@ -75,8 +75,8 @@ void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
 void handle_map_request(XEvent* e);
 
-void Dael_State_init(Dael_State* wm);
-void Dael_State_free(Dael_State* wm);
+void Dael_State_init(Dael_State* state);
+void Dael_State_free(Dael_State* state);
 
 int xerror_handler(Display* display, XErrorEvent* error);
 
@@ -96,30 +96,9 @@ int main(void)
         XEvent e;
 
         XSetErrorHandler(xerror_handler);
-
-        if (!(wm.dpy = XOpenDisplay(NULL))) {
-                fprintf(stderr, "Failed to open display.\n");
-                return 1;
-        }
-
-        wm.root = DefaultRootWindow(wm.dpy);
-
-        XSelectInput(
-                wm.dpy, wm.root,
-                SubstructureRedirectMask |
-                SubstructureNotifyMask |
-                PropertyChangeMask |
-                ButtonPressMask |
-                ButtonReleaseMask |
-                PointerMotionMask
-        );
-
+        Dael_State_init(&wm);
         grab_keys(&wm);
-
         XFlush(wm.dpy);
-
-        /* XSetErrorHandler(xerror_handler); */
-
         XSync(wm.dpy, False);
         wm.running = true;
 
@@ -134,14 +113,16 @@ int main(void)
 }
 
 
-void Dael_State_init(Dael_State* wm)
+void Dael_State_init(Dael_State* state)
 {
-        if (!(wm->dpy = XOpenDisplay(NULL)))
+        if (!(state->dpy = XOpenDisplay(NULL))) {
                 fprintf(stderr, "Failed to open display.\n");
-        wm->root = DefaultRootWindow(wm->dpy);
+                exit(1);
+        }
+        state->root = DefaultRootWindow(state->dpy);
 
         XSelectInput(
-                wm->dpy, wm->root,
+                state->dpy, state->root,
                 SubstructureRedirectMask |
                 SubstructureNotifyMask |
                 PropertyChangeMask |
@@ -150,27 +131,27 @@ void Dael_State_init(Dael_State* wm)
                 PointerMotionMask
         );
 
-        wm->curs.normal = XCreateFontCursor(wm->dpy, XC_left_ptr);
-        wm->curs.grab = XCreateFontCursor(wm->dpy, XC_fleur);
-        wm->curs.resize = XCreateFontCursor(wm->dpy, XC_sizing);
-        wm->curs.plus = XCreateFontCursor(wm->dpy, XC_plus);
-        XDefineCursor(wm->dpy, wm->root, wm->curs.normal);
+        state->curs.normal = XCreateFontCursor(state->dpy, XC_left_ptr);
+        state->curs.grab = XCreateFontCursor(state->dpy, XC_fleur);
+        state->curs.resize = XCreateFontCursor(state->dpy, XC_sizing);
+        state->curs.plus = XCreateFontCursor(state->dpy, XC_plus);
+        XDefineCursor(state->dpy, state->root, state->curs.normal);
 
-        wm->font = XLoadQueryFont(wm->dpy, FONT);
-        if (!wm->font) {
+        state->font = XLoadQueryFont(state->dpy, FONT);
+        if (!state->font) {
                 fprintf(stderr, "Failed to load font\n");
         }
 }
 
 
-void Dael_State_free(Dael_State* wm)
+void Dael_State_free(Dael_State* state)
 {
-        XFreeFont(wm->dpy, wm->font);
-        XFreeCursor(wm->dpy, wm->curs.normal);
-        XFreeCursor(wm->dpy, wm->curs.resize);
-        XFreeCursor(wm->dpy, wm->curs.grab);
-        XFreeCursor(wm->dpy, wm->curs.plus);
-        XCloseDisplay(wm->dpy);
+        XFreeFont(state->dpy, state->font);
+        XFreeCursor(state->dpy, state->curs.normal);
+        XFreeCursor(state->dpy, state->curs.resize);
+        XFreeCursor(state->dpy, state->curs.grab);
+        XFreeCursor(state->dpy, state->curs.plus);
+        XCloseDisplay(state->dpy);
 }
 
 
