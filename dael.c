@@ -82,6 +82,7 @@ void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 
 void grab_keys();
+void set_window_focus(Dael_Client* client);
 void set_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
@@ -416,22 +417,30 @@ void focus_next(const char* args)
         set_window_border(prev_focused);
         set_window_border(wm.current_workspace->focused);
 
-        XRaiseWindow(wm.dpy, wm.current_workspace->focused->win);
+        set_window_focus(wm.current_workspace->focused);
 }
 
 
 void focus_prev(const char* args)
 {
         Dael_Client* client;
+        Dael_Client* prev_focused;
         Dael_Client* prev = NULL;
         (void) args;
         if (!wm.current_workspace || !wm.current_workspace->clients)
                 return;
 
+        prev_focused = wm.current_workspace->focused;
+        client = wm.current_workspace->clients;
+
         while (client) {
-                if (client == wm.current_workspace->focused) {
+                if (client == prev_focused) {
                         wm.current_workspace->focused = prev ? prev : client;
-                        XRaiseWindow(wm.dpy, wm.current_workspace->focused->win);
+
+                        set_window_border(prev_focused);
+                        set_window_border(wm.current_workspace->focused);
+
+                        set_window_focus(wm.current_workspace->focused);
                         return;
                 }
                 prev = client;
@@ -439,6 +448,12 @@ void focus_prev(const char* args)
         }
 }
 
+
+void set_window_focus(Dael_Client* client)
+{
+        XSetInputFocus(wm.dpy, client->win, RevertToPointerRoot, CurrentTime);
+        XRaiseWindow(wm.dpy, client->win);
+}
 
 void handle_event(XEvent* e)
 {
@@ -475,7 +490,7 @@ void handle_map_request(XEvent* e)
         XMapWindow(wm.dpy, req->window);
 
         wm.current_workspace->focused = client;
-        XRaiseWindow(wm.dpy, client->win);
+        set_window_focus(client);
 
         apply_layout();
 }
