@@ -2,8 +2,8 @@
  * Colors are standard hex color codes, prefixed by '0x'
  */
 #define BORDER_SIZE 1
-#define BORDER_FOCUSED 0x55aaaa
-#define BORDER_UNFOCUSED 0xeaffff
+#define BORDER_FOCUSED 0xff0000
+#define BORDER_UNFOCUSED 0x043764
 #define BG_COLOR 0x000000
 #define FG_COLOR 0xffffff
 
