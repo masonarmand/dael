@@ -72,6 +72,7 @@ void focus_prev(const char* args);
 void append_workspace(const char* args);
 void next_workspace(const char* args);
 void prev_workspace(const char* args);
+void kill_window(const char* args);
 
 
 #include "config.h"
@@ -82,6 +83,7 @@ void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 
 void grab_keys();
+int send_event(Dael_Client* c, Atom proto);
 void set_window_focus(Dael_Client* client);
 void set_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
@@ -92,6 +94,7 @@ void Dael_State_init(Dael_State* state);
 void Dael_State_free(Dael_State* state);
 
 int xerror_handler(Display* display, XErrorEvent* error);
+int xerror_ignore(Display* display, XErrorEvent* error);
 
 /* XEvent handler functions */
 Dael_EventHandler event_handlers[] = {
@@ -348,25 +351,79 @@ void apply_layout(void)
         }
 
         /* master window takes left half of display */
-        mw = screen_w / 2 - BORDER_SIZE * 2;
-        mh = screen_h - BORDER_SIZE * 2;
+        mw = (num_slaves == 0) ? screen_w : screen_w / 2;
+        mh = screen_h;
+        mw -= BORDER_SIZE * 2;
+        mh -= BORDER_SIZE * 2;
 
         set_window_border(m);
         XMoveResizeWindow(wm.dpy, m->win, mx, my, mw, mh);
 
         if (num_slaves > 0) {
                 int cw = screen_w / 2 - BORDER_SIZE * 2;
-                int ch = screen_h / num_slaves - BORDER_SIZE * 2;
+                int total_height = screen_h - (num_slaves * BORDER_SIZE * 2);
+                int ch = total_height / num_slaves;
+                int extra_space = total_height % num_slaves;
                 int cx = screen_w / 2;
                 int cy = 0;
                 client = m->next;
 
                 while (client) {
+                        int height = ch;
                         set_window_border(client);
-                        XMoveResizeWindow(wm.dpy, client->win, cx, cy, cw, ch);
-                        cy += ch;
+                        if (extra_space > 0) {
+                                height += 1;
+                                extra_space--;
+                        }
+                        XMoveResizeWindow(wm.dpy, client->win, cx, cy, cw, height);
+                        cy += height + (BORDER_SIZE * 2);
                         client = client->next;
                 }
+        }
+
+}
+
+
+/* adopted from dwm.c from suckless */
+int send_event(Dael_Client* c, Atom proto)
+{
+        int n;
+        Atom* protocols;
+        Atom wm_protocols = XInternAtom(wm.dpy, "WM_PROTOCOLS", False);
+        int exists = 0;
+        XEvent e;
+
+        if (XGetWMProtocols(wm.dpy, c->win, &protocols, &n)) {
+                while (!exists && n--)
+                        exists = protocols[n] == proto;
+                XFree(protocols);
+        }
+        if (exists) {
+                e.type = ClientMessage;
+                e.xclient.window = c->win;
+                e.xclient.message_type = wm_protocols;
+                e.xclient.format = 32;
+                e.xclient.data.l[0] = proto;
+		e.xclient.data.l[1] = CurrentTime;
+                XSendEvent(wm.dpy, c->win, False, NoEventMask, &e);
+        }
+        return exists;
+}
+
+
+void kill_window(const char* args)
+{
+        Atom wm_delete = XInternAtom(wm.dpy, "WM_DELETE_WINDOW", False);
+        Dael_Client* client = wm.current_workspace->focused;
+        (void) args;
+        if (!send_event(client, wm_delete)) {
+                XGrabServer(wm.dpy);
+                XSetErrorHandler(xerror_ignore);
+                XSetCloseDownMode(wm.dpy, DestroyAll);
+                XKillClient(wm.dpy, client->win);
+                XSync(wm.dpy, False);
+                XSetErrorHandler(xerror_handler);
+                XUngrabServer(wm.dpy);
         }
 }
 
@@ -502,5 +559,13 @@ int xerror_handler(Display* display, XErrorEvent* error)
         XGetErrorText(display, error->error_code, error_msg, sizeof(error_msg));
         fprintf(stderr, "X Error: %s\n", error_msg);
         /*exit(1);*/
+        return 0;
+}
+
+
+int xerror_ignore(Display* display, XErrorEvent* error)
+{
+        (void) display;
+        (void) error;
         return 0;
 }

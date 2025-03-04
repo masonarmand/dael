@@ -18,15 +18,17 @@
 #define MODKEY Mod4Mask
 
 static const Dael_Keybinding config_keys[] = {
-        /* Modifier | Key | function | args */
-        { MODKEY, XK_d, launch_program, "dmenu_run" },
-        { MODKEY, XK_Return, launch_program, "st" },
-        { MODKEY | ShiftMask, XK_e, quit},
-        { MODKEY | ShiftMask, XK_l, next_workspace},
-        { MODKEY | ShiftMask, XK_h, prev_workspace},
-        { MODKEY | ShiftMask, XK_w, append_workspace},
-        { MODKEY, XK_l, focus_next},
-        { MODKEY, XK_h, focus_prev},
+        /*
+          Modifier------------Keycode----function---------args---------*/
+        { MODKEY,             XK_d,      launch_program,  "dmenu_run" },
+        { MODKEY,             XK_Return, launch_program,  "st"        },
+        { MODKEY | ShiftMask, XK_q,      kill_window                  },
+        { MODKEY | ShiftMask, XK_e,      quit                         },
+        { MODKEY | ShiftMask, XK_l,      next_workspace               },
+        { MODKEY | ShiftMask, XK_h,      prev_workspace               },
+        { MODKEY | ShiftMask, XK_w,      append_workspace             },
+        { MODKEY,             XK_l,      focus_next                   },
+        { MODKEY,             XK_h,      focus_prev                   },
 
 
 
