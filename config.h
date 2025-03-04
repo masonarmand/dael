@@ -20,7 +20,11 @@ static const Dael_Keybinding config_keys[] = {
         /* Modifier | Key | function | args */
         { MODKEY, XK_d, launch_program, "dmenu_run" },
         { MODKEY, XK_Return, launch_program, "st" },
-        { MODKEY | ShiftMask, XK_e, quit, "" },
+        { MODKEY | ShiftMask, XK_e, quit},
+        { MODKEY | ShiftMask, XK_l, next_workspace},
+        { MODKEY | ShiftMask, XK_h, prev_workspace},
+        { MODKEY, XK_w, append_workspace},
+
 
 
         { NoSymbol, 0, 0, 0 } /* end of keybind list (Do not remove) */

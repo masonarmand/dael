@@ -63,11 +63,20 @@ typedef struct {
         void (*handler)(XEvent*);
 } Dael_EventHandler;
 
+/* config.h / user key-bindable functions */
 void launch_program(const char* program);
 void quit(const char* args);
+void append_workspace(const char* args);
+void next_workspace(const char* args);
+void prev_workspace(const char* args);
+
 
 #include "config.h"
 
+Dael_Client* add_client(Window win);
+void remove_client(Window win);
+void hide_workspace(Dael_Workspace* ws);
+void show_workspace(Dael_Workspace* ws);
 
 void grab_keys();
 
@@ -110,6 +119,124 @@ int main(void)
 
         Dael_State_free(&wm);
         return 0;
+}
+
+
+Dael_Client* add_client(Window win)
+{
+        Dael_Client* new_c = malloc(sizeof(Dael_Client));
+
+        if (!wm.current_workspace) {
+                append_workspace(NULL);
+        }
+        new_c->win = win;
+        new_c->x = 0;
+        new_c->y = 0;
+        new_c->w = 800;
+        new_c->h = 600;
+        new_c->is_fullscreen = false;
+        new_c->next = wm.current_workspace->clients;
+        new_c->prev = NULL;
+
+        if (wm.current_workspace->clients) {
+                wm.current_workspace->clients->prev = new_c;
+        }
+        wm.current_workspace->clients = new_c;
+        return new_c;
+}
+
+
+void remove_client(Window win)
+{
+        Dael_Workspace* ws = wm.current_workspace;
+        Dael_Client* c;
+        if (!ws)
+                return;
+        c = ws->clients;
+        while (c) {
+                if (c->win == win) {
+                        if (c->prev) {
+                                c->prev->next = c->next;
+                        }
+                        else {
+                                ws->clients = c->next;
+                        }
+                        if (c->next) {
+                                c->next->prev = c->prev;
+                        }
+                        free(c);
+                        return;
+                }
+                c = c->next;
+        }
+}
+
+
+void append_workspace(const char* args)
+{
+        Dael_Workspace* new_ws = malloc(sizeof(Dael_Workspace));
+        new_ws->id = (wm.current_workspace) ? wm.current_workspace->id + 1 : 1;
+        new_ws->clients = NULL;
+        new_ws->next = NULL;
+        new_ws->prev = NULL;
+
+        if (!wm.current_workspace) {
+                wm.current_workspace = new_ws;
+        }
+        else {
+                Dael_Workspace* last = wm.current_workspace;
+                while (last->next)
+                        last = last->next;
+                last->next = new_ws;
+                new_ws->prev = last;
+        }
+
+        wm.current_workspace = new_ws;
+}
+
+
+void next_workspace(const char* args)
+{
+        if (wm.current_workspace && wm.current_workspace->next) {
+                hide_workspace(wm.current_workspace);
+                wm.current_workspace = wm.current_workspace->next;
+                show_workspace(wm.current_workspace);
+        }
+}
+
+
+void prev_workspace(const char* args)
+{
+        if (wm.current_workspace && wm.current_workspace->prev) {
+                hide_workspace(wm.current_workspace);
+                wm.current_workspace = wm.current_workspace->prev;
+                show_workspace(wm.current_workspace);
+        }
+}
+
+
+void hide_workspace(Dael_Workspace* ws)
+{
+        Dael_Client* client;
+        if (!ws)
+                return;
+        client = ws->clients;
+        while (client) {
+                XUnmapWindow(wm.dpy, client->win);
+                client = client->next;
+        }
+}
+
+void show_workspace(Dael_Workspace* ws)
+{
+        Dael_Client* client;
+        if (!ws)
+                return;
+        client = ws->clients;
+        while (client) {
+                XMapWindow(wm.dpy, client->win);
+                client = client->next;
+        }
 }
 
 
@@ -226,6 +353,7 @@ void handle_key_press(XEvent* e)
 void handle_map_request(XEvent* e)
 {
         XMapRequestEvent* req = &e->xmaprequest;
+        Dael_Client* client = add_client(req->window);
         XMapWindow(wm.dpy, req->window);
 }
 
