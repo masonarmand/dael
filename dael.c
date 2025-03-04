@@ -38,6 +38,7 @@ struct Dael_Client {
 struct Dael_Workspace {
         unsigned int id;
         Dael_Client* clients;
+        Dael_Client* focused;
         Dael_Workspace* next;
         Dael_Workspace* prev;
 };
@@ -66,6 +67,8 @@ typedef struct {
 /* config.h / user key-bindable functions */
 void launch_program(const char* program);
 void quit(const char* args);
+void focus_next(const char* args);
+void focus_prev(const char* args);
 void append_workspace(const char* args);
 void next_workspace(const char* args);
 void prev_workspace(const char* args);
@@ -79,7 +82,7 @@ void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 
 void grab_keys();
-
+void set_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
 void handle_map_request(XEvent* e);
@@ -125,6 +128,7 @@ int main(void)
 Dael_Client* add_client(Window win)
 {
         Dael_Client* new_c = malloc(sizeof(Dael_Client));
+        Dael_Client* last;
 
         if (!wm.current_workspace) {
                 append_workspace(NULL);
@@ -135,13 +139,20 @@ Dael_Client* add_client(Window win)
         new_c->w = 800;
         new_c->h = 600;
         new_c->is_fullscreen = false;
-        new_c->next = wm.current_workspace->clients;
+        new_c->next = NULL;
         new_c->prev = NULL;
 
-        if (wm.current_workspace->clients) {
-                wm.current_workspace->clients->prev = new_c;
+        last = wm.current_workspace->clients;
+        if (!last) {
+                wm.current_workspace->clients = new_c;
         }
-        wm.current_workspace->clients = new_c;
+        else {
+                while (last->next)
+                        last = last->next;
+                last->next = new_c;
+                new_c->prev = last;
+        }
+        set_window_border(new_c);
         return new_c;
 }
 
@@ -298,6 +309,67 @@ void grab_keys()
 }
 
 
+void set_window_border(Dael_Client* client)
+{
+        unsigned long color;
+        if (!client || !wm.current_workspace)
+                return;
+        color = (wm.current_workspace->focused == client)
+                ? BORDER_FOCUSED : BORDER_UNFOCUSED;
+        XSetWindowBorderWidth(wm.dpy, client->win, BORDER_SIZE);
+        XSetWindowBorder(wm.dpy, client->win, color);
+}
+
+
+void apply_layout(void)
+{
+        int screen_w;
+        int screen_h;
+        int mx = 0;
+        int my = 0;
+        int mh = 0;
+        int mw = 0;
+        Dael_Client* m;
+        Dael_Client* client;
+        int num_slaves = 0;
+
+        if (!wm.current_workspace || !wm.current_workspace->clients)
+                return;
+
+        screen_w = DisplayWidth(wm.dpy, DefaultScreen(wm.dpy));
+        screen_h = DisplayHeight(wm.dpy, DefaultScreen(wm.dpy));
+        m = wm.current_workspace->clients;
+        client = m->next;
+
+        while (client) {
+                num_slaves ++;
+                client = client->next;
+        }
+
+        /* master window takes left half of display */
+        mw = screen_w / 2 - BORDER_SIZE * 2;
+        mh = screen_h - BORDER_SIZE * 2;
+
+        set_window_border(m);
+        XMoveResizeWindow(wm.dpy, m->win, mx, my, mw, mh);
+
+        if (num_slaves > 0) {
+                int cw = screen_w / 2 - BORDER_SIZE * 2;
+                int ch = screen_h / num_slaves - BORDER_SIZE * 2;
+                int cx = screen_w / 2;
+                int cy = 0;
+                client = m->next;
+
+                while (client) {
+                        set_window_border(client);
+                        XMoveResizeWindow(wm.dpy, client->win, cx, cy, cw, ch);
+                        cy += ch;
+                        client = client->next;
+                }
+        }
+}
+
+
 void launch_program(const char* program)
 {
         pid_t pid = fork();
@@ -319,6 +391,52 @@ void quit(const char* args)
 {
         (void) args;
         wm.running = false;
+}
+
+
+void focus_next(const char* args)
+{
+        Dael_Client* client;
+        Dael_Client* prev_focused;
+        (void) args;
+
+        if (!wm.current_workspace || !wm.current_workspace->clients)
+                return;
+
+        prev_focused = wm.current_workspace->focused;
+        client = prev_focused->next;
+
+        if (client) {
+                wm.current_workspace->focused = client;
+        }
+        else {
+                wm.current_workspace->focused = wm.current_workspace->clients;
+        }
+
+        set_window_border(prev_focused);
+        set_window_border(wm.current_workspace->focused);
+
+        XRaiseWindow(wm.dpy, wm.current_workspace->focused->win);
+}
+
+
+void focus_prev(const char* args)
+{
+        Dael_Client* client;
+        Dael_Client* prev = NULL;
+        (void) args;
+        if (!wm.current_workspace || !wm.current_workspace->clients)
+                return;
+
+        while (client) {
+                if (client == wm.current_workspace->focused) {
+                        wm.current_workspace->focused = prev ? prev : client;
+                        XRaiseWindow(wm.dpy, wm.current_workspace->focused->win);
+                        return;
+                }
+                prev = client;
+                client = client->next;
+        }
 }
 
 
@@ -355,6 +473,11 @@ void handle_map_request(XEvent* e)
         XMapRequestEvent* req = &e->xmaprequest;
         Dael_Client* client = add_client(req->window);
         XMapWindow(wm.dpy, req->window);
+
+        wm.current_workspace->focused = client;
+        XRaiseWindow(wm.dpy, client->win);
+
+        apply_layout();
 }
 
 

@@ -1,6 +1,7 @@
 /*
  * Colors are standard hex color codes, prefixed by '0x'
  */
+#define BORDER_SIZE 1
 #define BORDER_FOCUSED 0x55aaaa
 #define BORDER_UNFOCUSED 0xeaffff
 #define BG_COLOR 0x000000
@@ -23,7 +24,9 @@ static const Dael_Keybinding config_keys[] = {
         { MODKEY | ShiftMask, XK_e, quit},
         { MODKEY | ShiftMask, XK_l, next_workspace},
         { MODKEY | ShiftMask, XK_h, prev_workspace},
-        { MODKEY, XK_w, append_workspace},
+        { MODKEY | ShiftMask, XK_w, append_workspace},
+        { MODKEY, XK_l, focus_next},
+        { MODKEY, XK_h, focus_prev},
 
 
 
