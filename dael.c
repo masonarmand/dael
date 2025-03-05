@@ -67,6 +67,7 @@ typedef struct {
 /* config.h / user key-bindable functions */
 void launch_program(const char* program);
 void quit(const char* args);
+void swap_master(const char* args);
 void focus_next(const char* args);
 void focus_prev(const char* args);
 void append_workspace(const char* args);
@@ -506,6 +507,52 @@ void quit(const char* args)
 {
         (void) args;
         wm.running = false;
+}
+
+
+void swap_master(const char* args)
+{
+        Dael_Client* master = wm.current_workspace->clients;
+        Dael_Client* focused = wm.current_workspace->focused;
+
+        if (!master || !focused || master == focused)
+                return;
+
+        /* adjacent, simple swap*/
+        if (master->next == focused) {
+                master->next = focused->next;
+                focused->prev = NULL;
+                focused->next = master;
+                master->prev = focused;
+
+                if (master->next)
+                        master->next->prev = master;
+        }
+        /* not adjacent */
+        else {
+                Dael_Client* fprev = focused->prev;
+                Dael_Client* fnext = focused->next;
+
+                /* Swap pointers */
+                focused->prev = NULL;
+                focused->next = master->next;
+                master->prev = fprev;
+                master->next = fnext;
+
+                /* Update linked list references */
+                if (focused->next)
+                        focused->next->prev = focused;
+                if (master->next)
+                        master->next->prev = master;
+                if (fprev)
+                        fprev->next = master;
+        }
+
+        wm.current_workspace->clients = focused;
+        wm.current_workspace->focused = master;
+
+        set_window_focus(master);
+        apply_layout();
 }
 
 

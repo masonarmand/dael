@@ -29,6 +29,7 @@ static const Dael_Keybinding config_keys[] = {
         { MODKEY | ShiftMask, XK_w,      append_workspace             },
         { MODKEY,             XK_l,      focus_next                   },
         { MODKEY,             XK_h,      focus_prev                   },
+        { MODKEY,             XK_space,  swap_master                  },
 
 
 
