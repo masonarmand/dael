@@ -26,10 +26,6 @@ typedef struct Dael_Workspace Dael_Workspace;
 
 struct Dael_Client {
         Window win;
-        int x;
-        int y;
-        int w;
-        int h;
         bool is_fullscreen;
         Dael_Client* next;
         Dael_Client* prev;
@@ -52,6 +48,7 @@ typedef struct {
 
 typedef struct {
         Dael_Cursors curs;
+        Dael_Workspace* workspaces;
         Dael_Workspace* current_workspace;
         XFontStruct* font;
         Window root;
@@ -78,9 +75,11 @@ void kill_window(const char* args);
 #include "config.h"
 
 Dael_Client* add_client(Window win);
-void remove_client(Window win);
+void remove_client(Dael_Workspace* ws, Dael_Client* c);
+Dael_Client* get_client(Window win);
 void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
+Dael_Workspace* get_workspace_for_client(Dael_Client* client);
 
 void grab_keys();
 int send_event(Dael_Client* c, Atom proto);
@@ -89,6 +88,7 @@ void set_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
 void handle_map_request(XEvent* e);
+void handle_destroy_notify(XEvent* e);
 
 void Dael_State_init(Dael_State* state);
 void Dael_State_free(Dael_State* state);
@@ -100,6 +100,7 @@ int xerror_ignore(Display* display, XErrorEvent* error);
 Dael_EventHandler event_handlers[] = {
     { KeyPress, handle_key_press },
     { MapRequest, handle_map_request },
+    { DestroyNotify, handle_destroy_notify },
     { 0, NULL }
 };
 
@@ -136,12 +137,9 @@ Dael_Client* add_client(Window win)
 
         if (!wm.current_workspace) {
                 append_workspace(NULL);
+                wm.workspaces = wm.current_workspace;
         }
         new_c->win = win;
-        new_c->x = 0;
-        new_c->y = 0;
-        new_c->w = 800;
-        new_c->h = 600;
         new_c->is_fullscreen = false;
         new_c->next = NULL;
         new_c->prev = NULL;
@@ -161,29 +159,38 @@ Dael_Client* add_client(Window win)
 }
 
 
-void remove_client(Window win)
+void remove_client(Dael_Workspace* ws, Dael_Client* c)
 {
-        Dael_Workspace* ws = wm.current_workspace;
-        Dael_Client* c;
-        if (!ws)
+        if (!ws || !c)
                 return;
-        c = ws->clients;
-        while (c) {
-                if (c->win == win) {
-                        if (c->prev) {
-                                c->prev->next = c->next;
-                        }
-                        else {
-                                ws->clients = c->next;
-                        }
-                        if (c->next) {
-                                c->next->prev = c->prev;
-                        }
-                        free(c);
-                        return;
-                }
-                c = c->next;
+
+        if (c->prev)
+                c->prev->next = c->next;
+        if (c->next)
+                c->next->prev = c->prev;
+
+        if (ws->clients == c)
+                ws->clients = c->next;
+
+        if (ws->focused == c) {
+                ws->focused = (c->next) ? c->next : c->prev;
+                if (ws->focused)
+                        set_window_focus(ws->focused);
         }
+
+        free(c);
+}
+
+
+Dael_Client* get_client(Window win)
+{
+        Dael_Client* c;
+        Dael_Workspace* ws;
+        for (ws = wm.workspaces; ws; ws = ws->next)
+                for (c = ws->clients; c; c = c->next)
+                        if (c->win == win)
+                                return c;
+        return NULL;
 }
 
 
@@ -252,6 +259,24 @@ void show_workspace(Dael_Workspace* ws)
                 XMapWindow(wm.dpy, client->win);
                 client = client->next;
         }
+}
+
+
+Dael_Workspace* get_workspace_for_client(Dael_Client* client)
+{
+        Dael_Workspace* ws = wm.workspaces;
+
+        while (ws) {
+                Dael_Client* c = ws->clients;
+                while (c) {
+                        if (c == client) {
+                                return ws;
+                        }
+                        c = c->next;
+                }
+                ws = ws->next;
+        }
+        return NULL;
 }
 
 
@@ -540,6 +565,7 @@ void handle_key_press(XEvent* e)
         }
 }
 
+
 void handle_map_request(XEvent* e)
 {
         XMapRequestEvent* req = &e->xmaprequest;
@@ -550,6 +576,20 @@ void handle_map_request(XEvent* e)
         set_window_focus(client);
 
         apply_layout();
+}
+
+
+void handle_destroy_notify(XEvent* e)
+{
+        Dael_Client* c;
+        XDestroyWindowEvent* ev = &e->xdestroywindow;
+        if ((c = get_client(ev->window))) {
+                Dael_Workspace* ws;
+                if ((ws = get_workspace_for_client(c))) {
+                        remove_client(ws, c);
+                }
+                apply_layout();
+        }
 }
 
 
