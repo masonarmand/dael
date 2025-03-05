@@ -61,6 +61,9 @@ typedef struct {
         void (*handler)(XEvent*);
 } Dael_EventHandler;
 
+/* handy macro from dwm */
+#define CLEANMASK(mask) (mask & ~(numlockmask | LockMask))
+
 /* config.h / user key-bindable functions */
 void launch_program(const char* program);
 void quit(const char* args);
@@ -74,6 +77,7 @@ void kill_window(const char* args);
 
 #include "config.h"
 
+void update_numlockmask(void);
 Dael_Client* add_client(Window win);
 void remove_client(Dael_Workspace* ws, Dael_Client* c);
 Dael_Client* get_client(Window win);
@@ -81,7 +85,8 @@ void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 Dael_Workspace* get_workspace_for_client(Dael_Client* client);
 
-void grab_keys();
+void apply_layout(void);
+void grab_keys(void);
 int send_event(Dael_Client* c, Atom proto);
 void set_window_focus(Dael_Client* client);
 void set_window_border(Dael_Client* client);
@@ -106,6 +111,7 @@ Dael_EventHandler event_handlers[] = {
 
 /* global window manager state */
 Dael_State wm = { 0 };
+unsigned int numlockmask;
 
 
 int main(void)
@@ -114,10 +120,13 @@ int main(void)
 
         XSetErrorHandler(xerror_handler);
         Dael_State_init(&wm);
-        grab_keys(&wm);
+        grab_keys();
         XFlush(wm.dpy);
         XSync(wm.dpy, False);
         wm.running = true;
+
+        update_numlockmask();
+
 
         while (wm.running) {
                 XEvent e;
@@ -127,6 +136,29 @@ int main(void)
 
         Dael_State_free(&wm);
         return 0;
+}
+
+
+void update_numlockmask(void)
+{
+        XModifierKeymap* modmap = XGetModifierMapping(wm.dpy);
+        numlockmask = 0;
+        unsigned int j;
+        unsigned int k;
+        KeyCode numlock_keycode = XKeysymToKeycode(wm.dpy, XK_Num_Lock);
+
+        for (k = 0; k < 8; k++) {
+                for (j = 0; j < modmap->max_keypermod; j++) {
+                        unsigned int index = modmap->max_keypermod * k + j;
+                        KeyCode keycode = modmap->modifiermap[index];
+
+                        if (keycode == numlock_keycode) {
+                                numlockmask = (1 << k);
+                        }
+                }
+        }
+
+        XFreeModifiermap(modmap);
 }
 
 
@@ -213,7 +245,7 @@ void append_workspace(const char* args)
                 new_ws->prev = last;
         }
 
-        wm.current_workspace = new_ws;
+        next_workspace("");
 }
 
 
@@ -322,7 +354,7 @@ void Dael_State_free(Dael_State* state)
 }
 
 
-void grab_keys()
+void grab_keys(void)
 {
         unsigned int i = 0;
         XUngrabKey(wm.dpy, AnyKey, AnyModifier, wm.root);
@@ -553,9 +585,10 @@ void handle_key_press(XEvent* e)
 {
         unsigned int i = 0;
         XKeyEvent k = e->xkey;
+        unsigned int modmask = CLEANMASK(k.state);
         (void) wm;
         while (config_keys[i].key_sym != NoSymbol) {
-                if ((k.state & config_keys[i].mod)
+                if ((modmask == config_keys[i].mod)
                 && (k.keycode == XKeysymToKeycode(wm.dpy, config_keys[i].key_sym))
                 && (config_keys[i].func)) {
                         config_keys[i].func(config_keys[i].arg);
