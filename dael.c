@@ -14,6 +14,13 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+typedef enum {
+        NORMAL,
+        MONOCLE,
+
+        MODE_COUNT, /* not a tiling mode, just designates size of enum */
+} Dael_TilingMode;
+
 typedef struct {
         Cursor normal;
         Cursor resize;
@@ -33,6 +40,7 @@ struct Dael_Client {
 
 struct Dael_Workspace {
         unsigned int id;
+        Dael_TilingMode mode;
         Dael_Client* clients;
         Dael_Client* focused;
         Dael_Workspace* next;
@@ -73,6 +81,7 @@ void focus_prev(const char* args);
 void append_workspace(const char* args);
 void next_workspace(const char* args);
 void prev_workspace(const char* args);
+void cycle_tiling_mode(const char* args);
 void kill_window(const char* args);
 
 
@@ -87,10 +96,13 @@ void show_workspace(Dael_Workspace* ws);
 Dael_Workspace* get_workspace_for_client(Dael_Client* client);
 
 void apply_layout(void);
+void tile_normal(int w, int h);
+void tile_monocle(int w, int h);
 void grab_keys(void);
 int send_event(Dael_Client* c, Atom proto);
 void set_window_focus(Dael_Client* client);
 void set_window_border(Dael_Client* client);
+void remove_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
 void handle_map_request(XEvent* e);
@@ -234,6 +246,7 @@ void append_workspace(const char* args)
         new_ws->clients = NULL;
         new_ws->next = NULL;
         new_ws->prev = NULL;
+        new_ws->mode = NORMAL;
 
         if (!wm.current_workspace) {
                 wm.current_workspace = new_ws;
@@ -267,6 +280,17 @@ void prev_workspace(const char* args)
                 wm.current_workspace = wm.current_workspace->prev;
                 show_workspace(wm.current_workspace);
         }
+}
+
+
+void cycle_tiling_mode(const char* args)
+{
+        unsigned int i;
+        (void) args;
+
+        Dael_TilingMode cur = wm.current_workspace->mode;
+        wm.current_workspace->mode = (cur + 1) % MODE_COUNT;
+        apply_layout();
 }
 
 
@@ -383,23 +407,42 @@ void set_window_border(Dael_Client* client)
 }
 
 
+void remove_window_border(Dael_Client* client)
+{
+        if (!client)
+                return;
+        XSetWindowBorderWidth(wm.dpy, client->win, 0);
+        XSetWindowBorder(wm.dpy, client->win, 0x000000);
+}
+
+
 void apply_layout(void)
 {
-        int screen_w;
-        int screen_h;
-        int mx = 0;
-        int my = 0;
+        int screen_w = DisplayWidth(wm.dpy, DefaultScreen(wm.dpy));
+        int screen_h = DisplayHeight(wm.dpy, DefaultScreen(wm.dpy));
+
+        if (!wm.current_workspace || !wm.current_workspace->clients)
+                return;
+
+        switch (wm.current_workspace->mode) {
+        case NORMAL:
+                tile_normal(screen_w, screen_h);
+                break;
+        case MONOCLE:
+                tile_monocle(screen_w, screen_h);
+                break;
+        }
+}
+
+
+void tile_normal(int w, int h)
+{
         int mh = 0;
         int mw = 0;
         Dael_Client* m;
         Dael_Client* client;
         int num_slaves = 0;
 
-        if (!wm.current_workspace || !wm.current_workspace->clients)
-                return;
-
-        screen_w = DisplayWidth(wm.dpy, DefaultScreen(wm.dpy));
-        screen_h = DisplayHeight(wm.dpy, DefaultScreen(wm.dpy));
         m = wm.current_workspace->clients;
         client = m->next;
 
@@ -409,20 +452,20 @@ void apply_layout(void)
         }
 
         /* master window takes left half of display */
-        mw = (num_slaves == 0) ? screen_w : screen_w / 2;
-        mh = screen_h;
+        mw = (num_slaves == 0) ? w : w / 2;
+        mh = h;
         mw -= BORDER_SIZE * 2;
         mh -= BORDER_SIZE * 2;
 
         set_window_border(m);
-        XMoveResizeWindow(wm.dpy, m->win, mx, my, mw, mh);
+        XMoveResizeWindow(wm.dpy, m->win, 0, 0, mw, mh);
 
         if (num_slaves > 0) {
-                int cw = screen_w / 2 - BORDER_SIZE * 2;
-                int total_height = screen_h - (num_slaves * BORDER_SIZE * 2);
+                int cw = w / 2 - BORDER_SIZE * 2;
+                int total_height = h - (num_slaves * BORDER_SIZE * 2);
                 int ch = total_height / num_slaves;
                 int extra_space = total_height % num_slaves;
-                int cx = screen_w / 2;
+                int cx = w / 2;
                 int cy = 0;
                 client = m->next;
 
@@ -438,7 +481,20 @@ void apply_layout(void)
                         client = client->next;
                 }
         }
+}
 
+
+/* in monocle mode, the focused window is the master window
+ * and fills the entirety of the screen */
+void tile_monocle(int w, int h)
+{
+        Dael_Client* c = wm.current_workspace->clients;
+
+        while (c) {
+                remove_window_border(c);
+                XMoveResizeWindow(wm.dpy, c->win, 0, 0, w, h);
+                c = c->next;
+        }
 }
 
 
