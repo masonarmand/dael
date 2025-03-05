@@ -27,6 +27,16 @@ master window. Tiling will look like this:
 |        |   |
 --------------
 
+window management functions
+`kill_window`      | kill/close a window
+`launch_program`   | summon a window/task
+`append_workspace` | create a workspace
+`next_workspace`   | go to next workspace
+`prev_workspace`   | go to previous workspace
+`focus_next`       | moves focus to previous window
+`focus_prev`       | moves focus to next window
+`swap_master`      | swaps currently focused window with master window
+
 Workspaces
 ==========
 Workspaces function like nodes in a linked list. You can cycle through the
