@@ -199,7 +199,7 @@ Dael_Client* add_client(Window win)
                 last->next = new_c;
                 new_c->prev = last;
         }
-        set_window_border(new_c);
+        /*set_window_border(new_c);*/
         return new_c;
 }
 
@@ -412,7 +412,7 @@ void remove_window_border(Dael_Client* client)
         if (!client)
                 return;
         XSetWindowBorderWidth(wm.dpy, client->win, 0);
-        XSetWindowBorder(wm.dpy, client->win, 0x000000);
+        XFlush(wm.dpy);
 }
 
 
@@ -451,8 +451,13 @@ void tile_normal(int w, int h)
                 client = client->next;
         }
 
+        if (num_slaves == 0) {
+                tile_monocle(w, h);
+                return;
+        }
+
         /* master window takes left half of display */
-        mw = (num_slaves == 0) ? w : w / 2;
+        mw = w / 2;
         mh = h;
         mw -= BORDER_SIZE * 2;
         mh -= BORDER_SIZE * 2;
@@ -607,34 +612,34 @@ void focus_next(const char* args)
         set_window_border(wm.current_workspace->focused);
 
         set_window_focus(wm.current_workspace->focused);
+        apply_layout();
 }
 
 
 void focus_prev(const char* args)
 {
-        Dael_Client* client;
         Dael_Client* prev_focused;
-        Dael_Client* prev = NULL;
         (void) args;
+
         if (!wm.current_workspace || !wm.current_workspace->clients)
                 return;
 
         prev_focused = wm.current_workspace->focused;
-        client = wm.current_workspace->clients;
 
-        while (client) {
-                if (client == prev_focused) {
-                        wm.current_workspace->focused = prev ? prev : client;
-
-                        set_window_border(prev_focused);
-                        set_window_border(wm.current_workspace->focused);
-
-                        set_window_focus(wm.current_workspace->focused);
-                        return;
+        if (prev_focused->prev) {
+                wm.current_workspace->focused = prev_focused->prev;
+        } else {
+                wm.current_workspace->focused = wm.current_workspace->clients;
+                while (wm.current_workspace->focused->next) {
+                        wm.current_workspace->focused = wm.current_workspace->focused->next;
                 }
-                prev = client;
-                client = client->next;
         }
+
+        set_window_border(prev_focused);
+        set_window_border(wm.current_workspace->focused);
+
+        set_window_focus(wm.current_workspace->focused);
+        apply_layout();
 }
 
 
