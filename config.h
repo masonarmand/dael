@@ -17,22 +17,36 @@
  */
 #define MODKEY Mod4Mask
 
+/*
+ * The amount by which the master window gets resized when calling
+ * increase_size or decrease_size
+ * This is a percentage of the screen width.
+ */
+#define SIZE_INCREMENT 5
+
+/* default master window size when on a new workspace */
+#define MASTER_DEFAULT 50
+
+#define MASTER_MAX 90 /* maximum master window size % */
+#define MASTER_MIN 50 /* minimum master window size % */
+
 static const Dael_Keybinding config_keys[] = {
-        /*
-          Modifier------------Keycode----function----------args---------*/
-        { MODKEY,             XK_d,      launch_program,   "dmenu_run" },
-        { MODKEY,             XK_Return, launch_program,   "st"        },
-        { MODKEY | ShiftMask, XK_q,      kill_window                   },
-        { MODKEY | ShiftMask, XK_e,      quit                          },
-        { MODKEY | ShiftMask, XK_l,      next_workspace                },
-        { MODKEY | ShiftMask, XK_h,      prev_workspace                },
-        { MODKEY | ShiftMask, XK_w,      append_workspace              },
-        { MODKEY,             XK_m,      cycle_tiling_mode             },
-        { MODKEY,             XK_l,      focus_next                    },
-        { MODKEY,             XK_h,      focus_prev                    },
-        { MODKEY,             XK_space,  swap_master                   },
+/* Modifier------------Keycode-----------function----------args---------*/
+ { MODKEY,             XK_d,             launch_program,   "dmenu_run" },
+ { MODKEY,             XK_Return,        launch_program,   "st"        },
+ { MODKEY | ShiftMask, XK_q,             kill_window                   },
+ { MODKEY | ShiftMask, XK_e,             quit                          },
+ { MODKEY | ShiftMask, XK_l,             next_workspace                },
+ { MODKEY | ShiftMask, XK_h,             prev_workspace                },
+ { MODKEY | ShiftMask, XK_w,             append_workspace              },
+ { MODKEY,             XK_m,             cycle_tiling_mode             },
+ { MODKEY,             XK_l,             focus_next                    },
+ { MODKEY,             XK_h,             focus_prev                    },
+ { MODKEY,             XK_space,         swap_master                   },
+ { MODKEY,             XK_bracketright,  increase_size                 },
+ { MODKEY,             XK_bracketleft,   decrease_size                 },
 
 
 
-        { NoSymbol, 0, 0, 0 } /* end of keybind list (Do not remove) */
+{ NoSymbol, 0, 0, 0 } /* end of keybind list (Do not remove) */
 };

@@ -40,6 +40,7 @@ struct Dael_Client {
 
 struct Dael_Workspace {
         unsigned int id;
+        unsigned int master_size;
         Dael_TilingMode mode;
         Dael_Client* clients;
         Dael_Client* focused;
@@ -72,12 +73,17 @@ typedef struct {
 /* handy macro from dwm */
 #define CLEANMASK(mask) (mask & ~(numlockmask | LockMask))
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 /* config.h / user key-bindable functions */
 void launch_program(const char* program);
 void quit(const char* args);
 void swap_master(const char* args);
 void focus_next(const char* args);
 void focus_prev(const char* args);
+void increase_size(const char* args);
+void decrease_size(const char* args);
 void append_workspace(const char* args);
 void next_workspace(const char* args);
 void prev_workspace(const char* args);
@@ -95,6 +101,7 @@ void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 Dael_Workspace* get_workspace_for_client(Dael_Client* client);
 
+void change_master_size(int amount);
 void apply_layout(void);
 void tile_normal(int w, int h);
 void tile_monocle(int w, int h);
@@ -247,6 +254,7 @@ void append_workspace(const char* args)
         new_ws->next = NULL;
         new_ws->prev = NULL;
         new_ws->mode = NORMAL;
+        new_ws->master_size = MASTER_DEFAULT;
 
         if (!wm.current_workspace) {
                 wm.current_workspace = new_ws;
@@ -442,6 +450,7 @@ void tile_normal(int w, int h)
         Dael_Client* m;
         Dael_Client* client;
         int num_slaves = 0;
+        int msize = wm.current_workspace->master_size;
 
         m = wm.current_workspace->clients;
         client = m->next;
@@ -457,7 +466,7 @@ void tile_normal(int w, int h)
         }
 
         /* master window takes left half of display */
-        mw = w / 2;
+        mw = (w * msize) / 100;
         mh = h;
         mw -= BORDER_SIZE * 2;
         mh -= BORDER_SIZE * 2;
@@ -466,11 +475,11 @@ void tile_normal(int w, int h)
         XMoveResizeWindow(wm.dpy, m->win, 0, 0, mw, mh);
 
         if (num_slaves > 0) {
-                int cw = w / 2 - BORDER_SIZE * 2;
+                int cw = (w - mw) - BORDER_SIZE * 2;
                 int total_height = h - (num_slaves * BORDER_SIZE * 2);
                 int ch = total_height / num_slaves;
                 int extra_space = total_height % num_slaves;
-                int cx = w / 2;
+                int cx = mw;
                 int cy = 0;
                 client = m->next;
 
@@ -639,6 +648,34 @@ void focus_prev(const char* args)
         set_window_border(wm.current_workspace->focused);
 
         set_window_focus(wm.current_workspace->focused);
+        apply_layout();
+}
+
+
+void increase_size(const char* args)
+{
+        change_master_size(SIZE_INCREMENT);
+}
+
+
+void decrease_size(const char* args)
+{
+        change_master_size(-SIZE_INCREMENT);
+}
+
+
+void change_master_size(int amount)
+{
+        int new_size;
+        int clamped_size;
+
+        if (wm.current_workspace->mode == MONOCLE)
+                return;
+
+        new_size = wm.current_workspace->master_size + amount;
+        clamped_size = MIN(MASTER_MAX, MAX(MASTER_MIN, new_size));
+        wm.current_workspace->master_size = clamped_size;
+
         apply_layout();
 }
 
