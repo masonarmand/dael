@@ -516,13 +516,14 @@ void swap_master(const char* args)
         Dael_Client* master = wm.current_workspace->clients;
         Dael_Client* focused = wm.current_workspace->focused;
 
-        if (master && focused && focused != master) {
-                tmp = master->win;
-                master->win = focused->win;
-                focused->win = tmp;
-        }
+        if (!master || !focused || focused == master)
+                return;
 
-        set_window_focus(master);
+        tmp = master->win;
+        master->win = focused->win;
+        focused->win = tmp;
+
+        set_window_focus(wm.current_workspace->focused);
         apply_layout();
 }
 
