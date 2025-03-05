@@ -512,44 +512,15 @@ void quit(const char* args)
 
 void swap_master(const char* args)
 {
+        Window tmp;
         Dael_Client* master = wm.current_workspace->clients;
         Dael_Client* focused = wm.current_workspace->focused;
 
-        if (!master || !focused || master == focused)
-                return;
-
-        /* adjacent, simple swap*/
-        if (master->next == focused) {
-                master->next = focused->next;
-                focused->prev = NULL;
-                focused->next = master;
-                master->prev = focused;
-
-                if (master->next)
-                        master->next->prev = master;
+        if (master && focused && focused != master) {
+                tmp = master->win;
+                master->win = focused->win;
+                focused->win = tmp;
         }
-        /* not adjacent */
-        else {
-                Dael_Client* fprev = focused->prev;
-                Dael_Client* fnext = focused->next;
-
-                /* Swap pointers */
-                focused->prev = NULL;
-                focused->next = master->next;
-                master->prev = fprev;
-                master->next = fnext;
-
-                /* Update linked list references */
-                if (focused->next)
-                        focused->next->prev = focused;
-                if (master->next)
-                        master->next->prev = master;
-                if (fprev)
-                        fprev->next = master;
-        }
-
-        wm.current_workspace->clients = focused;
-        wm.current_workspace->focused = master;
 
         set_window_focus(master);
         apply_layout();
