@@ -5,24 +5,6 @@
  * Date Created: Feb 27, 2025
  * Last Modified: March 05, 2025
  */
-
-/*
- * TODO
- * floating
- *
- * Handlers:
- * - ConfigureRequest
- * - ConfigureNotify
- * - EnterNotify
- * - Expose
- * - FocusIn
- * - MappingNotify
- * - PropertyNotify
- * - UnmapNotify
- *
- * Floating if:
- * - NetWMTypeDialog
- */
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
