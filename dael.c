@@ -7,7 +7,6 @@
  */
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
-#include <X11/cursorfont.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <stdbool.h>
@@ -23,13 +22,6 @@ typedef enum {
 
         MODE_COUNT /* not a tiling mode, just designates size of enum */
 } Dael_TilingMode;
-
-typedef struct {
-        Cursor normal;
-        Cursor resize;
-        Cursor grab;
-        Cursor plus;
-} Dael_Cursors;
 
 typedef struct Dael_Client Dael_Client;
 typedef struct Dael_Workspace Dael_Workspace;
@@ -60,10 +52,8 @@ typedef struct {
 } Dael_Keybinding;
 
 typedef struct {
-        Dael_Cursors curs;
         Dael_Workspace* workspaces;
         Dael_Workspace* current_workspace;
-        XFontStruct* font;
         Window root;
         Display* dpy;
         bool running;
@@ -104,7 +94,6 @@ Dael_Client* get_client(Window win);
 void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 Dael_Workspace* get_workspace_for_client(Dael_Client* client);
-void grab_change_cursor(Window window, Cursor cursor);
 
 void get_screen_center(int* x, int* y);
 void change_master_size(int amount);
@@ -387,27 +376,11 @@ void Dael_State_init(Dael_State* state)
                 PropertyChangeMask |
                 PointerMotionMask
         );
-
-        state->curs.normal = XCreateFontCursor(state->dpy, XC_left_ptr);
-        state->curs.grab = XCreateFontCursor(state->dpy, XC_fleur);
-        state->curs.resize = XCreateFontCursor(state->dpy, XC_sizing);
-        state->curs.plus = XCreateFontCursor(state->dpy, XC_plus);
-        XDefineCursor(state->dpy, state->root, state->curs.normal);
-
-        state->font = XLoadQueryFont(state->dpy, FONT);
-        if (!state->font) {
-                fprintf(stderr, "Failed to load font\n");
-        }
 }
 
 
 void Dael_State_free(Dael_State* state)
 {
-        XFreeFont(state->dpy, state->font);
-        XFreeCursor(state->dpy, state->curs.normal);
-        XFreeCursor(state->dpy, state->curs.resize);
-        XFreeCursor(state->dpy, state->curs.grab);
-        XFreeCursor(state->dpy, state->curs.plus);
         XCloseDisplay(state->dpy);
 }
 
