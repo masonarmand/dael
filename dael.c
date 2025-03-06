@@ -5,14 +5,38 @@
  * Date Created: Feb 27, 2025
  * Last Modified: Feb 27, 2025
  */
+
+/*
+ * TODO
+ * floating
+ * mouseinput
+ *
+ * Handlers:
+ * - ConfigureRequest
+ * - ConfigureNotify
+ * - EnterNotify
+ * - Expose
+ * - FocusIn
+ * - MappingNotify
+ * - MapRequest
+ * - MotionNotify
+ * - PropertyNotify
+ * - UnmapNotify
+ *
+ * Floating if:
+ * - NetWMTypeDialog
+ */
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
+
+void test_func(XButtonEvent* e);
 
 typedef enum {
         NORMAL,
@@ -34,6 +58,7 @@ typedef struct Dael_Workspace Dael_Workspace;
 struct Dael_Client {
         Window win;
         bool is_fullscreen;
+        bool is_floating;
         Dael_Client* next;
         Dael_Client* prev;
 };
@@ -55,10 +80,23 @@ typedef struct {
         const void* arg;
 } Dael_Keybinding;
 
+
+typedef struct {
+        unsigned int mod;
+        unsigned int btn;
+        void (*func)(XButtonEvent*);
+} Dael_Mousebinding;
+
+typedef struct {
+        XButtonEvent ev;
+        XWindowAttributes attr;
+} Dael_MouseState;
+
 typedef struct {
         Dael_Cursors curs;
         Dael_Workspace* workspaces;
         Dael_Workspace* current_workspace;
+        Dael_MouseState mouse_state;
         XFontStruct* font;
         Window root;
         Display* dpy;
@@ -84,6 +122,7 @@ void focus_next(const char* args);
 void focus_prev(const char* args);
 void increase_size(const char* args);
 void decrease_size(const char* args);
+void toggle_floating(const char* args);
 void append_workspace(const char* args);
 void next_workspace(const char* args);
 void prev_workspace(const char* args);
@@ -100,18 +139,25 @@ Dael_Client* get_client(Window win);
 void hide_workspace(Dael_Workspace* ws);
 void show_workspace(Dael_Workspace* ws);
 Dael_Workspace* get_workspace_for_client(Dael_Client* client);
+void grab_change_cursor(Window window, Cursor cursor);
 
 void change_master_size(int amount);
 void apply_layout(void);
+void bring_floating_to_top(void);
 void tile_normal(int w, int h);
 void tile_monocle(int w, int h);
 void grab_keys(void);
+void grab_buttons(void);
 int send_event(Dael_Client* c, Atom proto);
+Atom get_window_atom_property(Dael_Client* c, Atom prop);
 void set_window_focus(Dael_Client* client);
 void set_window_border(Dael_Client* client);
 void remove_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
 void handle_key_press(XEvent* e);
+void handle_button_press(XEvent* e);
+void handle_button_release(XEvent* e);
+void handle_motion_notify(XEvent* e);
 void handle_map_request(XEvent* e);
 void handle_destroy_notify(XEvent* e);
 
@@ -124,6 +170,9 @@ int xerror_ignore(Display* display, XErrorEvent* error);
 /* XEvent handler functions */
 Dael_EventHandler event_handlers[] = {
     { KeyPress, handle_key_press },
+    { ButtonPress, handle_button_press },
+    { ButtonRelease, handle_button_release },
+    { MotionNotify, handle_motion_notify },
     { MapRequest, handle_map_request },
     { DestroyNotify, handle_destroy_notify },
     { 0, NULL }
@@ -141,6 +190,7 @@ int main(void)
         XSetErrorHandler(xerror_handler);
         Dael_State_init(&wm);
         grab_keys();
+        grab_buttons();
         XFlush(wm.dpy);
         XSync(wm.dpy, False);
         wm.running = true;
@@ -345,6 +395,22 @@ Dael_Workspace* get_workspace_for_client(Dael_Client* client)
 }
 
 
+void grab_change_cursor(Window window, Cursor cursor)
+{
+        XGrabPointer(
+                wm.dpy,
+                window,
+                True,
+                ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                GrabModeAsync,
+                GrabModeAsync,
+                None,
+                cursor,
+                CurrentTime
+        );
+}
+
+
 void Dael_State_init(Dael_State* state)
 {
         if (!(state->dpy = XOpenDisplay(NULL))) {
@@ -352,6 +418,7 @@ void Dael_State_init(Dael_State* state)
                 exit(1);
         }
         state->root = DefaultRootWindow(state->dpy);
+        state->mouse_state.ev.subwindow = None;
 
         XSelectInput(
                 state->dpy, state->root,
@@ -403,6 +470,24 @@ void grab_keys(void)
 }
 
 
+void grab_buttons(void)
+{
+        unsigned int i = 0;
+
+        while (config_buttons[i].btn != 0) {
+                unsigned int btn = config_buttons[i].btn;
+                unsigned int mod = config_buttons[i].mod;
+
+                XGrabButton(
+                        wm.dpy, btn, mod, wm.root, True,
+                        ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                        GrabModeAsync, GrabModeAsync, None, None
+                );
+                i++;
+        }
+}
+
+
 void set_window_border(Dael_Client* client)
 {
         unsigned long color;
@@ -440,6 +525,18 @@ void apply_layout(void)
                 tile_monocle(screen_w, screen_h);
                 break;
         }
+
+        /*bring_floating_to_top();*/
+}
+
+
+void bring_floating_to_top(void)
+{
+        Dael_Client* clients = wm.current_workspace->clients;
+        while (clients) {
+                XRaiseWindow(wm.dpy, clients->win);
+                clients = clients->next;
+        }
 }
 
 
@@ -456,7 +553,8 @@ void tile_normal(int w, int h)
         client = m->next;
 
         while (client) {
-                num_slaves ++;
+                if (!client->is_floating)
+                        num_slaves++;
                 client = client->next;
         }
 
@@ -485,7 +583,14 @@ void tile_normal(int w, int h)
 
                 while (client) {
                         int height = ch;
+
+                        if (client->is_floating) {
+                                client = client->next;
+                                continue;
+                        }
+
                         set_window_border(client);
+
                         if (extra_space > 0) {
                                 height += 1;
                                 extra_space--;
@@ -536,6 +641,23 @@ int send_event(Dael_Client* c, Atom proto)
                 XSendEvent(wm.dpy, c->win, False, NoEventMask, &e);
         }
         return exists;
+}
+
+
+Atom get_window_atom_property(Dael_Client* c, Atom prop)
+{
+        int dummy_i;
+        unsigned long dummy_l;
+        unsigned char* p = NULL;
+        Atom dummy_a;
+        Atom atom = None;
+
+        if (XGetWindowProperty(
+                wm.dpy, c->win, prop, 0L, sizeof atom, False, XA_ATOM,
+                &dummy_a, &dummy_i, &dummy_l, &dummy_l, &p) == Success && p) {
+                XFree(p);
+        }
+        return atom;
 }
 
 
@@ -664,6 +786,16 @@ void decrease_size(const char* args)
 }
 
 
+void toggle_floating(const char* args)
+{
+        (void) args;
+        bool floating = wm.current_workspace->focused->is_floating;
+
+        wm.current_workspace->focused->is_floating = !floating;
+        apply_layout();
+}
+
+
 void change_master_size(int amount)
 {
         int new_size;
@@ -703,7 +835,7 @@ void handle_key_press(XEvent* e)
         unsigned int i = 0;
         XKeyEvent k = e->xkey;
         unsigned int modmask = CLEANMASK(k.state);
-        (void) wm;
+
         while (config_keys[i].key_sym != NoSymbol) {
                 if ((modmask == config_keys[i].mod)
                 && (k.keycode == XKeysymToKeycode(wm.dpy, config_keys[i].key_sym))
@@ -716,11 +848,87 @@ void handle_key_press(XEvent* e)
 }
 
 
+void handle_button_press(XEvent* e)
+{
+        unsigned int i = 0;
+        XButtonEvent btn = e->xbutton;
+        unsigned int modmask = CLEANMASK(btn.state);
+
+        wm.mouse_state.ev = btn;
+        if (btn.subwindow != None) {
+                XGetWindowAttributes(
+                        wm.dpy,
+                        btn.subwindow,
+                        &wm.mouse_state.attr
+                );
+        }
+
+        while (config_buttons[i].btn != 0) {
+                if ((modmask == config_buttons[i].mod)
+                && (btn.button == config_buttons[i].btn)
+                && (config_buttons[i].func)) {
+                        config_buttons[i].func(&btn);
+                }
+                i++;
+        }
+
+}
+
+
+void handle_button_release(XEvent* e)
+{
+        (void) e;
+        XUngrabPointer(wm.dpy, CurrentTime);
+        wm.mouse_state.ev.subwindow = None;
+}
+
+
+void handle_motion_notify(XEvent* e)
+{
+        /*
+        XButtonEvent start;
+        XWindowAttributes attr;
+        int dx;
+        int dy;
+        Dael_Client* c;
+
+        start = wm.mouse_state.ev;
+
+        if (!c->is_floating || start.subwindow == None)
+                return;
+
+        attr = wm.mouse_state.attr;
+        c = get_client(start.subwindow);
+        dx = e->xbutton.x_root - start.x_root;
+        dy = e->xbutton.y_root - start.y_root;
+        */
+
+        /* TODO */
+        /*
+        XMoveResizeWindow(wm.dpy, start.subwindow,
+                attr.x + (start.button==1 ? dx : 0),
+                attr.y + (start.button==1 ? dy : 0),
+                MAX(1, attr.width + (start.button==3 ? dx : 0)),
+                MAX(1, attr.height + (start.button==3 ? dy : 0)));
+                */
+}
+
+
 void handle_map_request(XEvent* e)
 {
         XMapRequestEvent* req = &e->xmaprequest;
+        Atom type = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE", False);
+        Atom dialog = XInternAtom(wm.dpy, "_NET_WM_TYPE_DIALOG", False);
+        Atom atom;
         Dael_Client* client = add_client(req->window);
+
         XMapWindow(wm.dpy, req->window);
+
+        atom = get_window_atom_property(client, type);
+        client->is_floating = (atom == dialog);
+
+        if (client->is_floating)
+                printf("Client is floating\n");
 
         wm.current_workspace->focused = client;
         set_window_focus(client);
@@ -758,4 +966,11 @@ int xerror_ignore(Display* display, XErrorEvent* error)
         (void) display;
         (void) error;
         return 0;
+}
+
+
+void test_func(XButtonEvent* e)
+{
+        grab_change_cursor(e->subwindow, wm.curs.grab);
+        printf("Click\n");
 }
