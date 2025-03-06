@@ -37,7 +37,7 @@ typedef enum {
         NORMAL,
         MONOCLE,
 
-        MODE_COUNT, /* not a tiling mode, just designates size of enum */
+        MODE_COUNT /* not a tiling mode, just designates size of enum */
 } Dael_TilingMode;
 
 typedef struct {
@@ -165,8 +165,6 @@ unsigned int numlockmask;
 
 int main(void)
 {
-        XEvent e;
-
         XSetErrorHandler(xerror_handler);
         Dael_State_init(&wm);
         grab_keys();
@@ -191,10 +189,11 @@ int main(void)
 void update_numlockmask(void)
 {
         XModifierKeymap* modmap = XGetModifierMapping(wm.dpy);
-        numlockmask = 0;
-        unsigned int j;
-        unsigned int k;
         KeyCode numlock_keycode = XKeysymToKeycode(wm.dpy, XK_Num_Lock);
+        unsigned int k;
+        int j;
+
+        numlockmask = 0;
 
         for (k = 0; k < 8; k++) {
                 for (j = 0; j < modmap->max_keypermod; j++) {
@@ -285,6 +284,8 @@ void append_workspace(const char* args)
         new_ws->mode = NORMAL;
         new_ws->master_size = MASTER_DEFAULT;
 
+        (void) args;
+
         if (!wm.current_workspace) {
                 wm.current_workspace = new_ws;
         }
@@ -302,6 +303,7 @@ void append_workspace(const char* args)
 
 void next_workspace(const char* args)
 {
+        (void) args;
         if (wm.current_workspace && wm.current_workspace->next) {
                 hide_workspace(wm.current_workspace);
                 wm.current_workspace = wm.current_workspace->next;
@@ -312,6 +314,7 @@ void next_workspace(const char* args)
 
 void prev_workspace(const char* args)
 {
+        (void) args;
         if (wm.current_workspace && wm.current_workspace->prev) {
                 hide_workspace(wm.current_workspace);
                 wm.current_workspace = wm.current_workspace->prev;
@@ -322,10 +325,9 @@ void prev_workspace(const char* args)
 
 void cycle_tiling_mode(const char* args)
 {
-        unsigned int i;
+        Dael_TilingMode cur = wm.current_workspace->mode;
         (void) args;
 
-        Dael_TilingMode cur = wm.current_workspace->mode;
         wm.current_workspace->mode = (cur + 1) % MODE_COUNT;
         apply_layout();
 }
@@ -466,6 +468,8 @@ void apply_layout(void)
         case MONOCLE:
                 tile_monocle(screen_w, screen_h);
                 break;
+        default:
+                tile_normal(screen_w, screen_h);
         }
 
         manage_floating_windows();
@@ -669,6 +673,7 @@ void swap_master(const char* args)
         Window tmp;
         Dael_Client* master = wm.current_workspace->clients;
         Dael_Client* focused = wm.current_workspace->focused;
+        (void) args;
 
         if (!master || !focused || focused == master)
                 return;
@@ -738,12 +743,14 @@ void focus_prev(const char* args)
 
 void increase_size(const char* args)
 {
+        (void) args;
         change_master_size(SIZE_INCREMENT);
 }
 
 
 void decrease_size(const char* args)
 {
+        (void) args;
         change_master_size(-SIZE_INCREMENT);
 }
 
@@ -817,6 +824,7 @@ void handle_property_notify(XEvent* e)
 
 void handle_configure_request(XEvent* e)
 {
+        (void) e;
         /*
         XConfigureRequestEvent *ev = &e->xconfigurerequest;
         XWindowChanges wc;

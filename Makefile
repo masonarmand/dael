@@ -1,27 +1,14 @@
-WARNINGS = -Wpedantic -pedantic-errors
-WARNINGS += -Werror
-WARNINGS += -Wall
-WARNINGS += -Wextra
-WARNINGS += -Wold-style-definition
+WARNINGS = -Wall -Wextra -Wpedantic -Werror
 WARNINGS += -Wcast-align
 WARNINGS += -Wformat=2
 WARNINGS += -Wlogical-op
-WARNINGS += -Wmissing-declarations
 WARNINGS += -Wmissing-include-dirs
-WARNINGS += -Wmissing-prototypes
 WARNINGS += -Wnested-externs
-WARNINGS += -Wpointer-arith
-WARNINGS += -Wredundant-decls
-WARNINGS += -Wsequence-point
-WARNINGS += -Wshadow
-WARNINGS += -Wstrict-prototypes
-WARNINGS += -Wundef
-WARNINGS += -Wunreachable-code
-WARNINGS += -Wwrite-strings
 WARNINGS += -Wdisabled-optimization
 WARNINGS += -Wunsafe-loop-optimizations
 WARNINGS += -Wfree-nonheap-object
-WARNINGS += -Wswitch
+# Ignored errors
+WARNINGS += -Wno-missing-field-initializers
 
 CC = gcc
 CFLAGS = -std=c89
@@ -34,8 +21,8 @@ EXEC = dael
 all: build
 
 build:
-	#$(CC) -g $(CFLAGS) $(WARNINGS) $(SOURCES) $(LDFLAGS) -o $(EXEC)
-	$(CC) -g $(CFLAGS) $(SOURCES) $(LDFLAGS) -o $(EXEC)
+	$(CC) -g $(CFLAGS) $(WARNINGS) $(SOURCES) $(LDFLAGS) -o $(EXEC)
+	#$(CC) -g $(CFLAGS) $(SOURCES) $(LDFLAGS) -o $(EXEC)
 
 run:
 	./$(EXEC)
