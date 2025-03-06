@@ -132,9 +132,12 @@ void grab_keys(void);
 int send_event(Dael_Client* c, Atom proto);
 Atom get_window_atom_property(Dael_Client* c, Atom prop);
 void set_window_focus(Dael_Client* client);
+void update_window_type(Dael_Client* c);
 void set_window_border(Dael_Client* client);
 void remove_window_border(Dael_Client* client);
 void handle_event(XEvent* e);
+void handle_property_notify(XEvent* e);
+void handle_configure_request(XEvent *e);
 void handle_key_press(XEvent* e);
 void handle_map_request(XEvent* e);
 void handle_destroy_notify(XEvent* e);
@@ -149,7 +152,9 @@ int xerror_ignore(Display* display, XErrorEvent* error);
 Dael_EventHandler event_handlers[] = {
     { KeyPress, handle_key_press },
     { MapRequest, handle_map_request },
+    { PropertyNotify, handle_property_notify },
     { DestroyNotify, handle_destroy_notify },
+    { ConfigureRequest, handle_configure_request },
     { 0, NULL }
 };
 
@@ -611,6 +616,7 @@ Atom get_window_atom_property(Dael_Client* c, Atom prop)
         if (XGetWindowProperty(
                 wm.dpy, c->win, prop, 0L, sizeof atom, False, XA_ATOM,
                 &dummy_a, &dummy_i, &dummy_l, &dummy_l, &p) == Success && p) {
+                atom = *(Atom *)p;
                 XFree(p);
         }
         return atom;
@@ -773,6 +779,16 @@ void set_window_focus(Dael_Client* client)
         XRaiseWindow(wm.dpy, client->win);
 }
 
+
+void update_window_type(Dael_Client* c)
+{
+        Atom type = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE", False);
+        Atom dialog = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+        Atom atom = get_window_atom_property(c, type);
+        c->is_floating = (atom == dialog);
+}
+
+
 void handle_event(XEvent* e)
 {
         Dael_EventHandler* h;
@@ -782,6 +798,42 @@ void handle_event(XEvent* e)
                         return;
                 }
         }
+}
+
+
+void handle_property_notify(XEvent* e)
+{
+        Dael_Client* c;
+        XPropertyEvent* ev = &e->xproperty;
+        Atom type = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE", False);
+
+        if ((c = get_client(ev->window))) {
+                if (ev->atom == type)
+                        update_window_type(c);
+        }
+        printf("propnotif\n");
+}
+
+
+void handle_configure_request(XEvent* e)
+{
+        /*
+        XConfigureRequestEvent *ev = &e->xconfigurerequest;
+        XWindowChanges wc;
+        Dael_Client* c = get_client(ev->window);
+
+        if (!c || !c->is_floating)
+                return;
+
+        wc.x = ev->x;
+        wc.y = ev->y;
+        wc.width = ev->width;
+        wc.height = ev->height;
+        wc.border_width = ev->border_width;
+        wc.sibling = ev->above;
+        wc.stack_mode = ev->detail;
+        XConfigureWindow(wm.dpy, ev->window, ev->value_mask, &wc);
+        */
 }
 
 
@@ -805,19 +857,19 @@ void handle_key_press(XEvent* e)
 
 void handle_map_request(XEvent* e)
 {
+        static XWindowAttributes wa;
         XMapRequestEvent* req = &e->xmaprequest;
-        Atom type = XInternAtom(wm.dpy, "_NET_WM_WINDOW_TYPE", False);
-        Atom dialog = XInternAtom(wm.dpy, "_NET_WM_TYPE_DIALOG", False);
-        Atom atom;
-        Dael_Client* client = add_client(req->window);
+        Dael_Client* client;
 
+	if (!XGetWindowAttributes(wm.dpy, req->window, &wa) || wa.override_redirect)
+		return;
+
+        if (get_client(req->window))
+                return;
+
+        client = add_client(req->window);
         XMapWindow(wm.dpy, req->window);
-
-        atom = get_window_atom_property(client, type);
-        client->is_floating = (atom == dialog);
-
-        if (client->is_floating)
-                printf("Client is floating\n");
+        update_window_type(client);
 
         wm.current_workspace->focused = client;
         set_window_focus(client);
