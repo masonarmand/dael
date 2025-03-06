@@ -141,9 +141,10 @@ void show_workspace(Dael_Workspace* ws);
 Dael_Workspace* get_workspace_for_client(Dael_Client* client);
 void grab_change_cursor(Window window, Cursor cursor);
 
+void get_screen_center(int* x, int* y);
 void change_master_size(int amount);
 void apply_layout(void);
-void bring_floating_to_top(void);
+void manage_floating_windows(void);
 void tile_normal(int w, int h);
 void tile_monocle(int w, int h);
 void grab_keys(void);
@@ -526,16 +527,17 @@ void apply_layout(void)
                 break;
         }
 
-        /*bring_floating_to_top();*/
+        manage_floating_windows();
 }
 
 
-void bring_floating_to_top(void)
+void manage_floating_windows(void)
 {
-        Dael_Client* clients = wm.current_workspace->clients;
-        while (clients) {
-                XRaiseWindow(wm.dpy, clients->win);
-                clients = clients->next;
+        Dael_Client* client = wm.current_workspace->clients;
+        while (client) {
+                XRaiseWindow(wm.dpy, client->win);
+                client = client->next;
+                set_window_border(client);
         }
 }
 
@@ -610,8 +612,10 @@ void tile_monocle(int w, int h)
         Dael_Client* c = wm.current_workspace->clients;
 
         while (c) {
-                remove_window_border(c);
-                XMoveResizeWindow(wm.dpy, c->win, 0, 0, w, h);
+                if (!c->is_floating) {
+                        remove_window_border(c);
+                        XMoveResizeWindow(wm.dpy, c->win, 0, 0, w, h);
+                }
                 c = c->next;
         }
 }
@@ -789,10 +793,30 @@ void decrease_size(const char* args)
 void toggle_floating(const char* args)
 {
         (void) args;
-        bool floating = wm.current_workspace->focused->is_floating;
+        Dael_Client* c = wm.current_workspace->focused;
+        bool floating = c->is_floating;
 
-        wm.current_workspace->focused->is_floating = !floating;
+        c->is_floating = !floating;
+        if (c->is_floating) {
+                int x;
+                int y;
+                unsigned int w = 640;
+                unsigned int h = 480;
+                get_screen_center(&x, &y);
+                x -= w / 2;
+                y -= h / 2;
+                XMoveResizeWindow(wm.dpy, c->win, x, y, w, h);
+        }
         apply_layout();
+}
+
+
+void get_screen_center(int* x, int* y)
+{
+        int screen_w = DisplayWidth(wm.dpy, DefaultScreen(wm.dpy));
+        int screen_h = DisplayHeight(wm.dpy, DefaultScreen(wm.dpy));
+        *x = screen_w / 2;
+        *y = screen_h / 2;
 }
 
 
@@ -885,32 +909,25 @@ void handle_button_release(XEvent* e)
 
 void handle_motion_notify(XEvent* e)
 {
-        /*
-        XButtonEvent start;
+        XButtonEvent start = wm.mouse_state.ev;
         XWindowAttributes attr;
+        Dael_Client* c = get_client(start.subwindow);
         int dx;
         int dy;
-        Dael_Client* c;
 
-        start = wm.mouse_state.ev;
-
-        if (!c->is_floating || start.subwindow == None)
+        if (start.subwindow == None || !c->is_floating)
                 return;
 
         attr = wm.mouse_state.attr;
-        c = get_client(start.subwindow);
         dx = e->xbutton.x_root - start.x_root;
         dy = e->xbutton.y_root - start.y_root;
-        */
 
-        /* TODO */
-        /*
         XMoveResizeWindow(wm.dpy, start.subwindow,
                 attr.x + (start.button==1 ? dx : 0),
                 attr.y + (start.button==1 ? dy : 0),
                 MAX(1, attr.width + (start.button==3 ? dx : 0)),
-                MAX(1, attr.height + (start.button==3 ? dy : 0)));
-                */
+                MAX(1, attr.height + (start.button==3 ? dy : 0))
+        );
 }
 
 
