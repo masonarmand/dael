@@ -60,3 +60,16 @@ Configuration
 =============
 Configuration - like dwm - is done through editing the config.h header
 file and re-compiling.
+
+Installation
+============
+run `sudo make install`
+
+Sandbox
+=======
+if you have Xephyr installed, you can do:
+```
+make
+./run_sandbox.sh
+```
+to run the window manager inside of your own window manager to test it.
