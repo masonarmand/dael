@@ -45,20 +45,8 @@ static const Dael_Keybinding config_keys[] = {
  { MODKEY,             XK_space,         swap_master                   },
  { MODKEY,             XK_bracketright,  increase_size                 },
  { MODKEY,             XK_bracketleft,   decrease_size                 },
- { MODKEY,             XK_f,             toggle_floating               },
 
 
 
 { NoSymbol, 0, 0, 0 } /* end of keybind list (Do not remove) */
-};
-
-
-static const Dael_Mousebinding config_buttons[] = {
-/* Modifier------------Mouse Button--function*/
- { MODKEY,             Button1,      test_func },
- { MODKEY,             Button2 },
- { MODKEY,             Button3 },
-
-
- { 0, 0 } /* end */
 };
