@@ -14,6 +14,9 @@ this window manager has a few basic color options but nothing else.
 This window manager is inspired by dwm, although it doesn't share the same
 source code.
 
+If you're wondering what 'dael' means: it is the first track on Autechre's
+1995 album Tri Repetae: https://en.wikipedia.org/wiki/Tri_Repetae
+
 Window Management
 =================
 
