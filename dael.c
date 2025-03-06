@@ -28,10 +28,12 @@
 #include <X11/cursorfont.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include <stdbool.h>
 
 typedef enum {
         NORMAL,
@@ -147,6 +149,7 @@ void Dael_State_free(Dael_State* state);
 
 int xerror_handler(Display* display, XErrorEvent* error);
 int xerror_ignore(Display* display, XErrorEvent* error);
+void die(const char* e);
 
 /* XEvent handler functions */
 Dael_EventHandler event_handlers[] = {
@@ -165,6 +168,7 @@ unsigned int numlockmask;
 
 int main(void)
 {
+        struct sigaction sa;
         XSetErrorHandler(xerror_handler);
         Dael_State_init(&wm);
         grab_keys();
@@ -173,6 +177,16 @@ int main(void)
         wm.running = true;
 
         update_numlockmask();
+
+        /* zombie handling from dwm */
+        /* do not transform children into zombies */
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT | SA_RESTART;
+        sa.sa_handler = SIG_IGN;
+        sigaction(SIGCHLD, &sa, NULL);
+
+        /* cleanup zombies */
+        while (waitpid(-1, NULL, WNOHANG) > 0);
 
 
         while (wm.running) {
@@ -646,10 +660,21 @@ void kill_window(const char* args)
 
 void launch_program(const char* program)
 {
+        struct sigaction sa;
         pid_t pid = fork();
 
         if (pid == 0) {
                 char* argv[] = {NULL, NULL};
+
+                if (wm.dpy)
+			close(ConnectionNumber(wm.dpy));
+		setsid();
+
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags = 0;
+		sa.sa_handler = SIG_DFL;
+		sigaction(SIGCHLD, &sa, NULL);
+
                 argv[0] = (char*) program;
                 execvp(argv[0], argv);
                 perror("execvp");
@@ -916,3 +941,11 @@ int xerror_ignore(Display* display, XErrorEvent* error)
         (void) error;
         return 0;
 }
+
+
+void die(const char* e)
+{
+        fprintf(stdout,"dael: %s\n",e);
+        exit(1);
+}
+

@@ -11,7 +11,7 @@ WARNINGS += -Wfree-nonheap-object
 WARNINGS += -Wno-missing-field-initializers
 
 CC = gcc
-CFLAGS = -std=c89
+CFLAGS = -std=c89 -D_POSIX_C_SOURCE=200809L
 LDFLAGS = -lX11
 SOURCES = *.c
 EXEC = dael
