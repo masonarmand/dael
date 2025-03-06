@@ -4,8 +4,6 @@
 #define BORDER_SIZE 1
 #define BORDER_FOCUSED 0xff0000
 #define BORDER_UNFOCUSED 0x043764
-#define BG_COLOR 0x000000
-#define FG_COLOR 0xffffff
 
 /* font */
 #define FONT "-misc-fixed-bold-r-normal--13-120-75-75-C-70-iso10646-1"
